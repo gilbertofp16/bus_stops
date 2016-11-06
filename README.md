@@ -1,4 +1,4 @@
-This project discover bus stops locations from activities points collected (activity_points.geojson) using the clustering method DBSCAN, cluster the information 
+This project discover bus stops locations from collected activities points  (activity_points.geojson) using the clustering method DBSCAN, cluster the information 
 and analyze the density from each cluster to give recommended bus stops. DBSCAN uses haversine
 metric and min samples = 1 to find spare activities. 
 

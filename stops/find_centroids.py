@@ -67,8 +67,6 @@ def start_find_points():
 
     # Print the outcome
     print('Estimated number of clusters: %d' % num_clusters)
-    print("Silhouette Coefficient: %0.3f"
-          % metrics.silhouette_score(coords, cluster_labels))
     print('Silhouette coefficient: {:0.03f}'.format(metrics.silhouette_score(coords, cluster_labels)))
 
     # turn the clusters in to a pandas series, where each element is a cluster of points

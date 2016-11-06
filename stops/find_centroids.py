@@ -13,26 +13,13 @@ def get_centermost_point(cluster):
     centermost_point = min(cluster, key=lambda point: great_circle(point, centroid).m)
     return tuple(centermost_point)
 
-def df_to_geojson(df, properties, lat='lat', lon='lon'):
-    geojson = {'type':'FeatureCollection', 'features':[]}
-    for _, row in df.iterrows():
-        feature = {'type':'Feature',
-                   'properties':{},
-                   'geometry':{'type':'Point',
-                               'coordinates':[]}}
-        feature['geometry']['coordinates'] = [row[lon],row[lat]]
-        for prop in properties:
-            feature['properties'][prop] = ""
-        geojson['features'].append(feature)
-    return geojson
-
+# Get coordinates from Geojson objects
 def get_coordinates(geojson,type):
 
     with open(geojson) as f:
         data = json.load(f)
 
     data = data['features']
-    # properties_labels = data[0]['properties'].keys()
     if type == "p":
         data= [ dict({"lat": object['geometry']['coordinates'][1], "lon": object['geometry']['coordinates'][0]}.items()
               + object['properties'].items()) for object in data ]
@@ -46,19 +33,22 @@ def start_find_points():
 
     warnings.filterwarnings('ignore')
 
+    # Obtain coordinates from activity points and routes
     dataroutes = get_coordinates('stops/routes.geojson',"r")
     datapoints = get_coordinates('stops/activity_points.geojson',"p")
+    coords = datapoints.as_matrix(columns=['lat', 'lon'])
+    coords_routes = dataroutes['coordinates'].tolist()
+
 
     # define the number of kilometers in one radian
     kms_per_radian = 6371.0088
-
-    coords = datapoints.as_matrix(columns=['lat', 'lon'])
-
-    coords_routes = dataroutes['coordinates'].tolist()
-
+    km = 0.8
     # define epsilon as 1.5 kilometers, converted to radians for use by haversine
-    epsilon = 0.300 / kms_per_radian
-    start_time = time.time()
+    epsilon = km / kms_per_radian
+    print(str(km*1000) + " meters used for haversine metric")
+
+    # Execute method DBSCAN, use just 1 min_samples  
+    # because of isolate user activity points
     db = DBSCAN(eps=epsilon, min_samples=1, algorithm='ball_tree', metric='haversine').fit(np.radians(coords))
     cluster_labels = db.labels_
 
@@ -79,10 +69,6 @@ def start_find_points():
 
     # from these lats/lons create a new df of one representative point for each cluster
     rep_points = pd.DataFrame({'lon': lons, 'lat': lats})
-    print(rep_points.head(10))
-
-    # it should be use for store geojson result
-    # bus_stops = df_to_geojson(rep_points, properties_labels)
 
     core_samples_mask = np.zeros_like(cluster_labels, dtype=bool)
     unique_labels = set(cluster_labels)
@@ -103,19 +89,25 @@ def start_find_points():
                  markeredgecolor='k', markersize=6)
 
     plt.title('Estimated number of clusters: %d' % num_clusters)
+    # Show clusters
     # plt.show()
 
+    # Create a web map from the first bus stop
     map = folium.Map(location=[lats[0], lons[0]], zoom_start=13,
                        tiles='Stamen Terrain')
+    
+    # Take all central points and marked them in the web map
     index = 1
     for lat, lon in zip(lats, lons):
         folium.Marker([lat, lon], popup=("Bus Stop for group: "+ str(index))).add_to(map)
         index+=1
 
+    # Draw routes inside web map
     for route in coords_routes:
         route = [tuple([coordinates[1],coordinates[0]]) for coordinates in route]
         folium.PolyLine(route, color="orange", weight=2.5, opacity=1).add_to(map)
 
+    # Save map as HTML for display as first page
     map.save('stops/templates/index.html')
 
 
